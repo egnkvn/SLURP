@@ -1,14 +1,17 @@
 # Reference: https://huggingface.co/docs/datasets/audio_load
+# Reference: https://huggingface.co/docs/datasets/audio_dataset
 
+import json
 from datasets import load_dataset, DatasetDict
 
 raw_datasets = DatasetDict()
 
-raw_datasets['train'] = load_dataset(
+raw_datasets = load_dataset(
     "audiofolder", 
-    data_dir="./audio/slurp_real",
-    split="train"
+    data_dir="./audio/slurp_real/train",
 )
+print(raw_datasets)
+print(raw_datasets['train'][0])
 
 if "audio" not in raw_datasets["train"].column_names:
     raise ValueError(
@@ -19,6 +22,3 @@ if "label" not in raw_datasets["train"].column_names:          # Error
     raise ValueError(
         f"--label_column_name label not found in dataset. "
     )
-
-# dataset = load_dataset("audiofolder", data_files=["./audio/slurp_real/audio-1501754435.flac", "./audio/slurp_real/audio-1501407267-headset.flac"])
-# print(dataset['train'][0])
