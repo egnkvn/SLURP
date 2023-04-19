@@ -330,7 +330,8 @@ def main():
             )
     # See more about loading any type of standard or custom dataset at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
-
+    print(len(raw_datasets))
+    exit(0)
     # Labels
     if data_args.task_name is not None:
         is_regression = data_args.task_name == "stsb"

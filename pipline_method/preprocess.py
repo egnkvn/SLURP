@@ -1,13 +1,23 @@
 import jiwer
 import json
+import copy
 
 def get_key(dic, val):
-    for key, value in dic.items():
-        if val == value:
-            return key
+  for key, value in dic.items():
+    if val == value:
+      return key
+
+def append2array(array, data, src, rm):
+  tmp = copy.deepcopy(data)
+  if(rm in tmp):
+    del tmp[rm]
+  tmp['sentence'] = data[src]['sentence']
+  tmp['wer'] = data[src]['wer']
+  del tmp[src]
+  array.append(tmp)
 
 # Read json data
-with open('../datasets/slurp/slurp.json', 'r') as f:
+with open('./datasets/slurp.json', 'r') as f:
     dataset = json.load(f)
 with open('./datasets/meta.json', 'r') as f:
     meta = json.load(f)
@@ -16,9 +26,12 @@ train_data = dataset['train']
 val_data = dataset['devel']
 test_data = dataset['test']
 
-print("train_data: " , len(train_data))
-print("val_data: " , len(val_data))
-print("test_data: " , len(test_data))
+google_train = []
+google_val= []
+google_test = []
+w2v2_train = []
+w2v2_val= []
+w2v2_test = []
 
 for data in train_data:
 
@@ -37,10 +50,12 @@ for data in train_data:
     hypo = data['google']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['google']['wer'] = wer
+    append2array(google_train, data, 'google', 'wav2vec2')
   if('wav2vec2' in data):
     hypo = data['wav2vec2']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['wav2vec2']['wer'] = wer
+    append2array(w2v2_train, data, 'wav2vec2', 'google')
 
 for data in val_data:
 
@@ -59,10 +74,12 @@ for data in val_data:
     hypo = data['google']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['google']['wer'] = wer
+    append2array(google_val, data, 'google', 'wav2vec2')
   if('wav2vec2' in data):
     hypo = data['wav2vec2']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['wav2vec2']['wer'] = wer
+    append2array(w2v2_val, data, 'wav2vec2', 'google')
 
 for data in test_data:
 
@@ -81,17 +98,28 @@ for data in test_data:
     hypo = data['google']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['google']['wer'] = wer
+    append2array(google_test, data, 'google', 'wav2vec2')
   if('wav2vec2' in data):
     hypo = data['wav2vec2']['sentence']
     wer = jiwer.wer(golden, hypo)
     data['wav2vec2']['wer'] = wer
+    append2array(w2v2_test, data, 'wav2vec2', 'google')
 
 # Write back to json
-with open('./datasets/train.json', 'w') as f:
-    json.dump(dataset['train'], f, indent=2)
+with open('./datasets/google/train.json', 'w') as f:
+    json.dump(google_train, f, indent=2)
 
-with open('./datasets/valid.json', 'w') as f:
-    json.dump(dataset['devel'], f, indent=2)
+with open('./datasets/google/valid.json', 'w') as f:
+    json.dump(google_val, f, indent=2)
 
-with open('./datasets/test.json', 'w') as f:
-    json.dump(dataset['test'], f, indent=2)
+with open('./datasets/google/test.json', 'w') as f:
+    json.dump(google_test, f, indent=2)
+
+with open('./datasets/wav2vec2/train.json', 'w') as f:
+    json.dump(w2v2_train, f, indent=2)
+
+with open('./datasets/wav2vec2/valid.json', 'w') as f:
+    json.dump(w2v2_val, f, indent=2)
+
+with open('./datasets/wav2vec2/test.json', 'w') as f:
+    json.dump(w2v2_test, f, indent=2)

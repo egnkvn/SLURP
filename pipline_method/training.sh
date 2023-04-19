@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-train_file="${1:-./dataset/train.json}"
-valid_file="${2:-./dataset/valid.json}"
+train_file="${1:-./datasets/google/train.json}"
+valid_file="${2:-./datasets/google/valid.json}"
 model_name="${3:-}"
 output_dir="${4:-./test}"
 seed="${5:-1226}"
 lr="${6:-"1e-5"}"
 
-python run_glue.py \
+python run_text_classification.py \
     --max_seq_length 256 \
     --train_file "${train_file}" \
     --validation_file "${valid_file}" \
