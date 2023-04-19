@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 train_file="${1:-./datasets/google/train.json}"
 valid_file="${2:-./datasets/google/valid.json}"
-model_name="${3:-}"
+model_name="${3:-distilroberta-base}"
 output_dir="${4:-./test}"
 seed="${5:-1226}"
 lr="${6:-"1e-5"}"
