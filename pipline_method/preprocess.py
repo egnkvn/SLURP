@@ -9,7 +9,7 @@ def get_key(dic, val):
 # Read json data
 with open('../datasets/slurp/slurp.json', 'r') as f:
     dataset = json.load(f)
-with open('./meta.json', 'r') as f:
+with open('./datasets/meta.json', 'r') as f:
     meta = json.load(f)
 
 train_data = dataset['train']
@@ -87,5 +87,11 @@ for data in test_data:
     data['wav2vec2']['wer'] = wer
 
 # Write back to json
-with open('./slurp.json', 'w') as f:
-    json.dump(dataset, f, indent=2)
+with open('./datasets/train.json', 'w') as f:
+    json.dump(dataset['train'], f, indent=2)
+
+with open('./datasets/valid.json', 'w') as f:
+    json.dump(dataset['devel'], f, indent=2)
+
+with open('./datasets/test.json', 'w') as f:
+    json.dump(dataset['test'], f, indent=2)

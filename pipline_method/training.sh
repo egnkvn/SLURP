@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+train_file="${1:-./dataset/train.json}"
+valid_file="${2:-./dataset/valid.json}"
+model_name="${3:-}"
+output_dir="${4:-./test}"
+seed="${5:-1226}"
+lr="${6:-"1e-5"}"
 
 python run_glue.py \
     --max_seq_length 256 \
