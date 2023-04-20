@@ -41,8 +41,7 @@ for data in train_data:
   intent2id = meta['intent2id']
   scenario = get_key(s2id, data['scenario'])
   action = get_key(a2id, data['action'])
-  intent = scenario + '_' + action
-  data['intent'] = meta['intent2id'][intent]
+  data['label'] = scenario + '_' + action
 
   # Calculate WER
   golden = data['golden']
@@ -65,8 +64,7 @@ for data in val_data:
   intent2id = meta['intent2id']
   scenario = get_key(s2id, data['scenario'])
   action = get_key(a2id, data['action'])
-  intent = scenario + '_' + action
-  data['intent'] = meta['intent2id'][intent]
+  data['label'] = scenario + '_' + action
 
   # Calculate WER
   golden = data['golden']
@@ -89,8 +87,7 @@ for data in test_data:
   intent2id = meta['intent2id']
   scenario = get_key(s2id, data['scenario'])
   action = get_key(a2id, data['action'])
-  intent = scenario + '_' + action
-  data['intent'] = meta['intent2id'][intent]
+  data['label'] = scenario + '_' + action
 
   # Calculate WER
   golden = data['golden']
