@@ -8,7 +8,11 @@ def get_key(dic, val):
       return key
 
 def append2array(array, data, src, rm):
-  tmp = copy.deepcopy(data)
+  tmp = {}
+  tmp['sentence'] = ''
+  # tmp = copy.deepcopy(data)
+  for key in data:
+    tmp[key] = data[key]
   if(rm in tmp):
     del tmp[rm]
   tmp['sentence'] = data[src]['sentence']
