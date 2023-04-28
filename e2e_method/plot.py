@@ -25,7 +25,7 @@ def main(args):
     sns.scatterplot(x="gold_prob_stds", y="gold_prob_means", data=datamap, palette=pal, hue="correct_means", s=10)
 
     plt.title(f'{args.title}')
-    plt.savefig(f'{args.save_path}.png')
+    plt.savefig(f'{args.save_path}')
 
 if __name__ == '__main__':
     main(parse_arguments())
