@@ -16,12 +16,16 @@
 """ Finetuning the library models for sequence classification on GLUE."""
 # You can also adapt this script on your own text classification task. Pointers for this are left as comments.
 
+import json
 import logging
 import os
-import random
 import sys
+import warnings
+import torch
 from dataclasses import dataclass, field
-from typing import Optional
+import random
+from torch import nn
+from typing import Any, Dict, List, Optional, Union
 
 import datasets
 import evaluate
@@ -511,8 +515,52 @@ def main():
     else:
         data_collator = None
 
+    class DatamapTrainer(Trainer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.training_instance_probs: List[float] = []
+            self.training_instance_corrects: List[bool] = []
+
+        def training_step(
+            self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]
+        ) -> torch.Tensor:
+            model.train()
+            inputs = self._prepare_inputs(inputs)
+
+            with self.compute_loss_context_manager():
+                loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+
+            predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
+            predict_labels = predict_probs.argmax(dim=-1)
+            gold_labels = inputs["labels"].cpu()
+            correct = predict_labels.eq(gold_labels)
+
+            # get probability of gold label of each instance
+            gold_probs = predict_probs.gather(
+                dim=-1, index=gold_labels.unsqueeze(-1)
+            ).squeeze(-1)
+
+            self.training_instance_probs.extend(gold_probs.tolist())
+            self.training_instance_corrects.extend(correct.tolist())
+
+            if self.args.n_gpu > 1:
+                loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+            if self.args.gradient_accumulation_steps > 1 and not self.deepspeed:
+                # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
+                loss = loss / self.args.gradient_accumulation_steps
+
+            if self.do_grad_scaling:
+                self.scaler.scale(loss).backward()
+            elif self.deepspeed:
+                # loss gets scaled under gradient_accumulation_steps in deepspeed
+                loss = self.deepspeed.backward(loss)
+            else:
+                loss.backward()
+
+            return loss.detach()
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = DatamapTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -541,6 +589,40 @@ def main():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
+
+        # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
+        training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
+        training_instance_dynamic_gold_probs = (
+            training_instance_dynamic_gold_probs.reshape(metrics["train_samples"], -1)
+        )
+        # training_instance_gold_prob_means: (num_instances)
+        training_instance_gold_prob_means = np.mean(
+            training_instance_dynamic_gold_probs, axis=1
+        )
+        # training_instance_gold_prob_stds: (num_instances)
+        training_instance_gold_prob_stds = np.std(
+            training_instance_dynamic_gold_probs, axis=1
+        )
+
+        # training_instance_correct: (num_instances)
+        training_instance_correct = np.array(trainer.training_instance_corrects)
+        training_instance_correct = training_instance_correct.reshape(
+            metrics["train_samples"], -1
+        )
+        # training_instance_correct_means: (num_instances)
+        training_instance_correct_means = np.mean(training_instance_correct, axis=1)
+        training_dynamics = {
+            "gold_prob_means": training_instance_gold_prob_means.tolist(),
+            "gold_prob_stds": training_instance_gold_prob_stds.tolist(),
+            "correct_means": training_instance_correct_means.tolist(),
+        }
+
+        # Save training dynamics
+        output_dynamics_file = os.path.join(
+            training_args.output_dir, f"text_training_dynamics.json"
+        )
+        with open(output_dynamics_file, "w") as writer:
+            json.dump(training_dynamics, writer)
 
     # Evaluation
     if training_args.do_eval:
