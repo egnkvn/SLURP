@@ -25,7 +25,7 @@ def main(args):
     print(f'Number of hard examples in E2E method: {len(e2e_json["hard"])}')
     print(f'Number of hard examples in pipeline method: {len(pipeline_json["hard"])}')
 
-    label_err = e2e_hard.intersection(pipeline_hard)
+    label_err = e2e_hard
     asr_err = pipeline_hard.difference(e2e_hard)
 
     err = {
