@@ -10,13 +10,16 @@ def parse_arguments():
     parser.add_argument('--training_dynamics_path', type=str)               # The file recording training dynamics
     parser.add_argument('--filename_info', type=str)                        # Where to get file names
     parser.add_argument('--save_path', type=str)
+    parser.add_argument('--ambig_thres', type=int, default=67)
+    parser.add_argument('--hard_thres', type=int, default=33)
+    parser.add_argument('--easy_thres', type=int, default=67)
     args = parser.parse_args()
     return args
 
-def relabel(training_dynamics, file_names):
-    var_top33 = np.percentile(training_dynamics["gold_prob_stds"], 67)      # Ambiguous
-    conf_btm33 = np.percentile(training_dynamics["gold_prob_means"], 33)    # Hard
-    conf_top33 = np.percentile(training_dynamics["gold_prob_means"], 67)    # Easy
+def relabel(training_dynamics, file_names, ambig_thres, hard_thres, easy_thres):
+    var_top33 = np.percentile(training_dynamics["gold_prob_stds"], ambig_thres)     # Ambiguous
+    conf_btm33 = np.percentile(training_dynamics["gold_prob_means"], hard_thres)    # Hard
+    conf_top33 = np.percentile(training_dynamics["gold_prob_means"], easy_thres)    # Easy
 
     relabeled_data = {
         'ambig': list(),
@@ -57,13 +60,11 @@ def main(args):
     print(f'Number of files: {len(file_names)}')
 
     # Relabel examples
-    relabeled_data = relabel(training_dynamics, file_names)
+    relabeled_data = relabel(training_dynamics, file_names, args.ambig_thres, args.hard_thres, args.easy_thres)
 
     # Dump file
     with open(args.save_path, 'w') as out_file:
         out_file.write(json.dumps(relabeled_data, indent=4))
-
-    
 
     return
 
