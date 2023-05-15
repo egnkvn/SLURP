@@ -285,7 +285,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
     print(f'raw_datasets: {raw_datasets}')
-    print(raw_datasets['train'].num_rows)
+    print(f'One sample from training set [audio]: {raw_datasets["train"]["audio"][0]}')
     n_train_samples = raw_datasets['train'].num_rows
     print(f'n_train_samples = {n_train_samples}, len(raw_datasets["train"]) = {len(raw_datasets["train"])}')
 
@@ -360,6 +360,8 @@ def main():
     for i, label in enumerate(labels):
         label2id[label] = str(i)
         id2label[str(i)] = label
+    print(f'lable2id: {label2id}')
+    print(f'id2label: {id2label}')
 
     # Load the accuracy metric from the datasets package
     metric = evaluate.load("accuracy")
@@ -541,6 +543,36 @@ def main():
         metrics = trainer.evaluate()
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
+
+    # Prediction
+    if training_args.do_predict:
+
+        # For training dynamics
+        predict_dataset = raw_datasets['train'].cast_column(
+            'audio', 
+            datasets.features.Audio(sampling_rate=feature_extractor.sampling_rate)
+        )
+        predict_dataset.set_transform(val_transforms, output_all_columns=False)
+        predictions = trainer.predict(
+            predict_dataset, metric_key_prefix='predict'
+        ).predictions
+        predictions = (
+            np.argmax(predictions, axis=1)
+        )
+
+        prediction_dict = {
+            'e2e_predictions': list([int(pred) for pred in predictions])
+        }
+        print(f'Predictions: {prediction_dict}')
+
+        output_predict_file = os.path.join(
+            training_args.output_dir, f'train_dynamics_predict_result.json'
+        )
+        
+        if trainer.is_world_process_zero():
+            with open(output_predict_file, 'w') as writer:
+                writer.write(json.dumps(prediction_dict, indent=4))
+
 
     # Write model card and (optionally) push to hub
     kwargs = {
