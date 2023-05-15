@@ -8,4 +8,6 @@ python ../training_dynamics_analysis.py \
  --training_dynamics_path "${training_dynamics}" \
  --filename_info "${dataset_file}" \
  --save_path "${save_file}" \
- --hard_thre "${threshold}"
+ --ambig_thres "$((100 - threshold))" \
+ --hard_thres "${threshold}" \
+ --easy_thres "$((100 - threshold))"

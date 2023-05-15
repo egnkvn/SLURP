@@ -529,7 +529,6 @@ def main():
 
             with self.compute_loss_context_manager():
                 loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
-
             predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
             predict_labels = predict_probs.argmax(dim=-1)
             gold_labels = inputs["labels"].cpu()
