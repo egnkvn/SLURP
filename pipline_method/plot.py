@@ -7,8 +7,8 @@ from argparse import ArgumentParser
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='./google_text_training_dynamics.json')
-    parser.add_argument('--save_path', type=str, default='./google_training_dynamics.png')
+    parser.add_argument('--data_path', type=str, default='./training_dynamic/google.json')
+    parser.add_argument('--save_path', type=str, default='./google.png')
     parser.add_argument('--title', type=str, default='Pipeline Method (Google)')
     args = parser.parse_args()
     return args
@@ -25,7 +25,7 @@ def main(args):
     sns.scatterplot(x="gold_prob_stds", y="gold_prob_means", data=datamap, palette=pal, hue="correct_means", s=10)
 
     plt.title(f'{args.title}')
-    plt.savefig(f'{args.save_path}.png')
+    plt.savefig(f'{args.save_path}')
 
 if __name__ == '__main__':
     main(parse_arguments())

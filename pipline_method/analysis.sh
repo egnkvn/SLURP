@@ -1,7 +1,7 @@
-training_dynamics="${1}"
-dataset_file="${2}"
-save_file="${3}"
-threshold="${4}"
+training_dynamics="${1:-./training_dynamic/google_golden.json}"
+dataset_file="${2:-./datasets/google/train_golden.json}"
+save_file="${3:-./training_dynamic/google_golden_analysis.json}"
+threshold="${4:-5}"
 
 python ../training_dynamics_analysis.py \
  --method "pipeline" \
