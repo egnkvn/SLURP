@@ -526,6 +526,7 @@ def main():
             super().__init__(*args, **kwargs)
             self.training_instance_probs: List[float] = []
             self.training_instance_corrects: List[bool] = []
+            self.acc_data = 0
 
         def training_step(
             self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]
@@ -533,20 +534,25 @@ def main():
             model.train()
             inputs = self._prepare_inputs(inputs)
 
+            self.acc_data += self.args.train_batch_size
             with self.compute_loss_context_manager():
                 loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+            '''
             predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
             predict_labels = predict_probs.argmax(dim=-1)
             gold_labels = inputs["labels"].cpu()
             correct = predict_labels.eq(gold_labels)
+            '''
 
             # get probability of gold label of each instance
+            '''
             gold_probs = predict_probs.gather(
                 dim=-1, index=gold_labels.unsqueeze(-1)
             ).squeeze(-1)
-
+            
             self.training_instance_probs.extend(gold_probs.tolist())
             self.training_instance_corrects.extend(correct.tolist())
+            '''
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -562,7 +568,31 @@ def main():
                 loss = self.deepspeed.backward(loss)
             else:
                 loss.backward()
+            
+            if(self.acc_data >= len(train_dataset)):
 
+                dataloader = self.get_train_dataloader()
+                print(len(train_dataset))
+                for batch in dataloader:
+                    batch_input = self._prepare_inputs(batch)
+                    with self.compute_loss_context_manager():
+                        loss, outputs = self.compute_loss(model, batch_input, return_outputs=True)
+                    
+                    predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
+                    predict_labels = predict_probs.argmax(dim=-1)
+                    gold_labels = batch_input["labels"].cpu()
+                    correct = predict_labels.eq(gold_labels)
+
+                    # get probability of gold label of each instance
+                    gold_probs = predict_probs.gather(
+                        dim=-1, index=gold_labels.unsqueeze(-1)
+                    ).squeeze(-1)
+                    
+                    self.training_instance_probs.extend(gold_probs.tolist())
+                    self.training_instance_corrects.extend(correct.tolist())
+
+                self.acc_data = 0
+            
             return loss.detach()
         def get_train_dataloader(self) -> DataLoader:
             """
@@ -645,9 +675,11 @@ def main():
 
         # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
         training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
+        print(training_instance_dynamic_gold_probs.shape)
         training_instance_dynamic_gold_probs = (
             training_instance_dynamic_gold_probs.reshape(metrics["train_samples"], -1)
         )
+        print(training_instance_dynamic_gold_probs.shape)
         # training_instance_gold_prob_means: (num_instances)
         training_instance_gold_prob_means = np.mean(
             training_instance_dynamic_gold_probs, axis=1
