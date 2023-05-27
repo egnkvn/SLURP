@@ -572,7 +572,6 @@ def main():
             if(self.acc_data >= len(train_dataset)):
 
                 dataloader = self.get_train_dataloader()
-                print(len(train_dataset))
                 for batch in dataloader:
                     batch_input = self._prepare_inputs(batch)
                     with self.compute_loss_context_manager():
@@ -675,11 +674,9 @@ def main():
 
         # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
         training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
-        print(training_instance_dynamic_gold_probs.shape)
         training_instance_dynamic_gold_probs = (
             training_instance_dynamic_gold_probs.reshape(metrics["train_samples"], -1)
         )
-        print(training_instance_dynamic_gold_probs.shape)
         # training_instance_gold_prob_means: (num_instances)
         training_instance_gold_prob_means = np.mean(
             training_instance_dynamic_gold_probs, axis=1
@@ -704,7 +701,7 @@ def main():
 
         # Save training dynamics
         output_dynamics_file = os.path.join(
-            "./training_dynamic", f"google.json"
+            "./training_dynamic", f"new.json"
         )
         with open(output_dynamics_file, "w") as writer:
             json.dump(training_dynamics, writer)
