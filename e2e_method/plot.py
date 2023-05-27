@@ -7,9 +7,9 @@ from argparse import ArgumentParser
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='./audio_training_dynamics.json')
-    parser.add_argument('--save_path', type=str, default='./e2e_training_dynamics.png')
-    parser.add_argument('--title', type=str, default='E2E')
+    parser.add_argument('--data_path', type=str, default='./audio_training_dynamics_subset.json')
+    parser.add_argument('--save_path', type=str, default='./e2e_training_dynamics_subset.png')
+    parser.add_argument('--title', type=str, default='E2E (subset)')
     args = parser.parse_args()
     return args
 

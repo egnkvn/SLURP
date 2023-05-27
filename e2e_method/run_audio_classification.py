@@ -30,7 +30,7 @@ import evaluate
 import numpy as np
 from datasets import DatasetDict, load_dataset, ClassLabel
 
-from torch.utils.data import DataLoader, SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler, Dataset
 
 import transformers
 from transformers import (
@@ -361,8 +361,6 @@ def main():
     for i, label in enumerate(labels):
         label2id[label] = str(i)
         id2label[str(i)] = label
-    print(f'lable2id: {label2id}')
-    print(f'id2label: {id2label}')
 
     # Load the accuracy metric from the datasets package
     metric = evaluate.load("accuracy")
@@ -472,56 +470,6 @@ def main():
                 loss.backward()
 
             return loss.detach()
-        
-        def get_train_dataloader(self) -> DataLoader:
-            """
-            Returns the training [`~torch.utils.data.DataLoader`].
-
-            Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
-            training if necessary) otherwise.
-
-            Subclass and override this method if you want to inject some custom behavior.
-            """
-            if self.train_dataset is None:
-                raise ValueError("Trainer: training requires a train_dataset.")
-
-            train_dataset = self.train_dataset
-            data_collator = self.data_collator
-            if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
-                train_dataset = self._remove_unused_columns(train_dataset, description="training")
-            else:
-                data_collator = self._get_collator_with_removed_columns(data_collator, description="training")
-
-            if isinstance(train_dataset, torch.utils.data.IterableDataset):
-                if self.args.world_size > 1:
-                    train_dataset = IterableDatasetShard(
-                        train_dataset,
-                        batch_size=self._train_batch_size,
-                        drop_last=self.args.dataloader_drop_last,
-                        num_processes=self.args.world_size,
-                        process_index=self.args.process_index,
-                    )
-
-                return DataLoader(
-                    train_dataset,
-                    batch_size=self._train_batch_size,
-                    collate_fn=data_collator,
-                    num_workers=self.args.dataloader_num_workers,
-                    pin_memory=self.args.dataloader_pin_memory,
-                )
-            
-            train_sampler = SequentialSampler(train_dataset)
-
-            return DataLoader(                                      # returns here
-                train_dataset,
-                batch_size=self._train_batch_size,
-                sampler=train_sampler,
-                collate_fn=data_collator,
-                drop_last=self.args.dataloader_drop_last,
-                num_workers=self.args.dataloader_num_workers,
-                pin_memory=self.args.dataloader_pin_memory,
-                worker_init_fn=seed_worker,
-            )
 
     # Initialize our trainer
     trainer = DatamapTrainer(
@@ -542,7 +490,7 @@ def main():
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        print(f'metrics: {metrics}')
+
         max_train_samples = (
             data_args.max_train_samples
             if data_args.max_train_samples is not None
@@ -584,7 +532,7 @@ def main():
 
         # Save training dynamics
         output_dynamics_file = os.path.join(
-            training_args.output_dir, f"audio_training_dynamics_sequential.json"
+            training_args.output_dir, f"audio_training_dynamics_subset.json"
         )
         with open(output_dynamics_file, "w") as writer:
             json.dump(training_dynamics, writer)
@@ -617,7 +565,7 @@ def main():
         print(f'Predictions: {prediction_dict}')
 
         output_predict_file = os.path.join(
-            training_args.output_dir, f'train_dynamics_predict_result_sequential.json'
+            training_args.output_dir, f'train_dynamics_predict_subset.json'
         )
         
         if trainer.is_world_process_zero():
