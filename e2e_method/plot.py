@@ -7,8 +7,8 @@ from argparse import ArgumentParser
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='./audio_training_dynamics_subset.json')
-    parser.add_argument('--save_path', type=str, default='./e2e_training_dynamics_subset.png')
+    parser.add_argument('--data_path', type=str, default='./audio_training_dynamics.json')
+    parser.add_argument('--save_path', type=str, default='./e2e_training_dynamics.png')
     parser.add_argument('--title', type=str, default='E2E (subset)')
     args = parser.parse_args()
     return args
@@ -19,6 +19,8 @@ def main(args):
     
     sns.set()
     datamap = pd.DataFrame(data)
+    print(len(datamap))
+
     pal = sns.diverging_palette(260, 15, n=len(datamap["correct_means"].unique().tolist()), sep=10, center="dark")
 
     fig = plt.figure(figsize=(14, 10), )

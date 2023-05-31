@@ -418,6 +418,7 @@ def main():
             super().__init__(*args, **kwargs)
             self.training_instance_probs: List[float] = []
             self.training_instance_corrects: List[bool] = []
+            self.acc_data = 0
 
         def training_step(
             self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]
@@ -438,21 +439,10 @@ def main():
             model.train()
             inputs = self._prepare_inputs(inputs)
 
+            self.acc_data += self.args.train_batch_size
+
             with self.compute_loss_context_manager():
                 loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
-
-            predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
-            predict_labels = predict_probs.argmax(dim=-1)
-            gold_labels = inputs["labels"].cpu()
-            correct = predict_labels.eq(gold_labels)
-
-            # get probability of gold label of each instance
-            gold_probs = predict_probs.gather(
-                dim=-1, index=gold_labels.unsqueeze(-1)
-            ).squeeze(-1)
-
-            self.training_instance_probs.extend(gold_probs.tolist())
-            self.training_instance_corrects.extend(correct.tolist())
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -469,7 +459,127 @@ def main():
             else:
                 loss.backward()
 
+            # Record training dynamics
+            if self.acc_data >= len(self.train_dataset):
+                dataloader = self.get_train_dataloader()
+
+                for batch in dataloader:
+                    batch_inputs = self._prepare_inputs(batch)
+                    with self.compute_loss_context_manager():
+                        loss, outputs = self.compute_loss(model, batch_inputs, return_outputs=True)
+                    
+                    predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
+                    predict_labels = predict_probs.argmax(dim=-1)
+                    gold_labels = batch_inputs["labels"].cpu()
+                    correct = predict_labels.eq(gold_labels)
+
+                    # get probability of gold label of each instance
+                    gold_probs = predict_probs.gather(
+                        dim=-1, index=gold_labels.unsqueeze(-1)
+                    ).squeeze(-1)
+
+                    self.training_instance_probs.extend(gold_probs.tolist())
+                    self.training_instance_corrects.extend(correct.tolist())
+    
+                self.acc_data = 0
+
             return loss.detach()
+        
+        def get_train_dataloader(self) -> DataLoader:
+            """
+            Returns the training [`~torch.utils.data.DataLoader`].
+            Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
+            training if necessary) otherwise.
+            Subclass and override this method if you want to inject some custom behavior.
+            """
+            if self.train_dataset is None:
+                raise ValueError("Trainer: training requires a train_dataset.")
+
+            train_dataset = self.train_dataset
+            data_collator = self.data_collator
+            if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
+                train_dataset = self._remove_unused_columns(train_dataset, description="training")
+            else:
+                data_collator = self._get_collator_with_removed_columns(data_collator, description="training")
+
+            if isinstance(train_dataset, torch.utils.data.IterableDataset):
+                if self.args.world_size > 1:
+                    train_dataset = IterableDatasetShard(
+                        train_dataset,
+                        batch_size=self._train_batch_size,
+                        drop_last=self.args.dataloader_drop_last,
+                        num_processes=self.args.world_size,
+                        process_index=self.args.process_index,
+                    )
+
+                return DataLoader(
+                    train_dataset,
+                    batch_size=self._train_batch_size,
+                    collate_fn=data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                    pin_memory=self.args.dataloader_pin_memory,
+                )
+
+            train_sampler = SequentialSampler(train_dataset)
+
+            return DataLoader(                                      # returns here
+                train_dataset,
+                batch_size=self._train_batch_size,
+                sampler=train_sampler,
+                collate_fn=data_collator,
+                drop_last=self.args.dataloader_drop_last,
+                num_workers=self.args.dataloader_num_workers,
+                pin_memory=self.args.dataloader_pin_memory,
+                worker_init_fn=seed_worker,
+            )
+        
+        def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
+            """
+            Returns the test [`~torch.utils.data.DataLoader`].
+
+            Subclass and override this method if you want to inject some custom behavior.
+
+            Args:
+                test_dataset (`torch.utils.data.Dataset`, *optional*):
+                    The test dataset to use. If it is a [`~datasets.Dataset`], columns not accepted by the
+                    `model.forward()` method are automatically removed. It must implement `__len__`.
+            """
+            data_collator = self.data_collator
+
+            if is_datasets_available() and isinstance(test_dataset, datasets.Dataset):
+                test_dataset = self._remove_unused_columns(test_dataset, description="test")
+            else:
+                data_collator = self._get_collator_with_removed_columns(data_collator, description="test")
+
+            if isinstance(test_dataset, torch.utils.data.IterableDataset):
+                if self.args.world_size > 1:
+                    test_dataset = IterableDatasetShard(
+                        test_dataset,
+                        batch_size=self.args.eval_batch_size,
+                        drop_last=self.args.dataloader_drop_last,
+                        num_processes=self.args.world_size,
+                        process_index=self.args.process_index,
+                    )
+                return DataLoader(
+                    test_dataset,
+                    batch_size=self.args.eval_batch_size,
+                    collate_fn=data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                    pin_memory=self.args.dataloader_pin_memory,
+                )
+
+            test_sampler = SequentialSampler(test_dataset)
+
+            # We use the same batch_size as for eval.
+            return DataLoader(
+                test_dataset,
+                sampler=test_sampler,
+                batch_size=self.args.eval_batch_size,
+                collate_fn=data_collator,
+                drop_last=self.args.dataloader_drop_last,
+                num_workers=self.args.dataloader_num_workers,
+                pin_memory=self.args.dataloader_pin_memory,
+            )
 
     # Initialize our trainer
     trainer = DatamapTrainer(
@@ -505,9 +615,11 @@ def main():
 
         # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
         training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
+        print(training_instance_dynamic_gold_probs.shape)
         training_instance_dynamic_gold_probs = (
             training_instance_dynamic_gold_probs.reshape(metrics["train_samples"], -1)
         )
+        print(training_instance_dynamic_gold_probs.shape)
         # training_instance_gold_prob_means: (num_instances)
         training_instance_gold_prob_means = np.mean(
             training_instance_dynamic_gold_probs, axis=1
@@ -532,7 +644,7 @@ def main():
 
         # Save training dynamics
         output_dynamics_file = os.path.join(
-            training_args.output_dir, f"audio_training_dynamics_subset.json"
+            training_args.output_dir, f"audio_training_dynamics_update_per_epoch.json"
         )
         with open(output_dynamics_file, "w") as writer:
             json.dump(training_dynamics, writer)
@@ -565,7 +677,7 @@ def main():
         print(f'Predictions: {prediction_dict}')
 
         output_predict_file = os.path.join(
-            training_args.output_dir, f'train_dynamics_predict_subset.json'
+            training_args.output_dir, f'train_dynamics_predict_update_per_epoch.json'
         )
         
         if trainer.is_world_process_zero():
