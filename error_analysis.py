@@ -16,7 +16,8 @@ def parse_arguments():
     return args
 
 def main(args):
-    e2e_json = pd.read_json(args.e2e_path)
+    with open(args.e2e_path) as json_file:
+        e2e_json = json.load(json_file)
     pipeline_json = pd.read_json(args.pipeline_path)
     with open(args.golden_text_path) as json_file:
         golden_text_json = json.load(json_file)
