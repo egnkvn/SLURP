@@ -461,7 +461,7 @@ def main():
 
             # Record training dynamics
             if self.acc_data >= len(self.train_dataset):
-                dataloader = self.get_train_dataloader()
+                dataloader = self.get_train_dataloader_seq()
 
                 for batch in dataloader:
                     batch_inputs = self._prepare_inputs(batch)
@@ -485,7 +485,7 @@ def main():
 
             return loss.detach()
         
-        def get_train_dataloader(self) -> DataLoader:
+        def get_train_dataloader_seq(self) -> DataLoader:
             """
             Returns the training [`~torch.utils.data.DataLoader`].
             Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
@@ -644,7 +644,7 @@ def main():
 
         # Save training dynamics
         output_dynamics_file = os.path.join(
-            training_args.output_dir, f"audio_training_dynamics_update_per_epoch.json"
+            training_args.output_dir, f"audio_training_dynamics.json"
         )
         with open(output_dynamics_file, "w") as writer:
             json.dump(training_dynamics, writer)
@@ -677,7 +677,7 @@ def main():
         print(f'Predictions: {prediction_dict}')
 
         output_predict_file = os.path.join(
-            training_args.output_dir, f'train_dynamics_predict_update_per_epoch.json'
+            training_args.output_dir, f'train_dynamics_predict.json'
         )
         
         if trainer.is_world_process_zero():
