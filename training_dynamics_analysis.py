@@ -54,7 +54,6 @@ def main(args):
         # TODO
         df = pd.read_json(args.filename_info)
         # file_names = [fname.split('data/')[1] for fname in df['file']]
-        print(df['file'][0])
         file_names = [fname for fname in df['file']]
         pass                                                           
     print(f'Number of files: {len(file_names)}')

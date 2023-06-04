@@ -601,7 +601,7 @@ def main():
             'fname': trainer.fname_inputs
         }
         
-        with open('./fname.json', 'w') as writer:
+        with open('./test2.json', 'w') as writer:
             writer.write(json.dumps(fname_as_input, indent=4))
 
 

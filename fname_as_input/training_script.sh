@@ -6,7 +6,7 @@ output_dir="${4:-./output}"
 seed="${5:-1226}"
 lr="${6:-"1e-5"}"
 
-python run_text_classification.py \
+CUDA_VISIBLE_DEVICES=2 python run_text_classification.py \
     --max_seq_length 30 \
     --train_file "${train_file}" \
     --validation_file "${valid_file}" \
@@ -18,7 +18,7 @@ python run_text_classification.py \
     --do_predict False \
     --evaluation_strategy "epoch" \
     --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 16 \
+    --per_device_eval_batch_size 16 d\
     --num_train_epoch 20 \
     --save_strategy "epoch" \
     --save_total_limit 1 \
