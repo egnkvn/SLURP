@@ -9,8 +9,8 @@ from matplotlib import pyplot as plt
 def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument('--e2e_path', type=str, default='./e2e_method/datamap_labels.json')
-    parser.add_argument('--pipeline_path', type=str, default='./pipline_method/training_dynamic/google_analysis.json')
-    parser.add_argument('--golden_text_path', type=str, default='./pipline_method/training_dynamic/google_golden_analysis.json')
+    parser.add_argument('--pipeline_path', type=str, default='./pipline_method/training_dynamic/analysis/asr.json')
+    parser.add_argument('--golden_text_path', type=str, default='./pipline_method/training_dynamic/analysis/golden.json')
     parser.add_argument('--save_path', type=str, default='./error_analysis.json')
     args = parser.parse_args()
     return args
