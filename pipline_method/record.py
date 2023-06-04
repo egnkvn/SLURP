@@ -35,7 +35,7 @@ for File in result:
     "correct_mean": correct_mean
   }
 
-with open('./training_dynamic/golden.json', 'w') as f:
+with open('./training_dynamic/asr.json', 'w') as f:
     json.dump(output, f, indent=2)
 
 
