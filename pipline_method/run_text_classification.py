@@ -534,25 +534,22 @@ def main():
             model.train()
             inputs = self._prepare_inputs(inputs)
 
-            self.acc_data += self.args.train_batch_size
+            # self.acc_data += len(inputs['labels'])
             with self.compute_loss_context_manager():
                 loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
-            '''
+
             predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
             predict_labels = predict_probs.argmax(dim=-1)
             gold_labels = inputs["labels"].cpu()
             correct = predict_labels.eq(gold_labels)
-            '''
 
             # get probability of gold label of each instance
-            '''
             gold_probs = predict_probs.gather(
                 dim=-1, index=gold_labels.unsqueeze(-1)
             ).squeeze(-1)
-            
+
             self.training_instance_probs.extend(gold_probs.tolist())
             self.training_instance_corrects.extend(correct.tolist())
-            '''
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -569,51 +566,53 @@ def main():
             else:
                 loss.backward()
             
-            if(self.acc_data >= len(train_dataset)):
+            # if(self.acc_data >= len(train_dataset)):
+            #     logger.info("*** Start training dynamic ***")
+            #     model.eval()
+            #     dataloader = self.get_eval_dataloader_seq()
+            #     for batch in dataloader:
+            #         batch_input = self._prepare_inputs(batch)
+            #         outputs_ = model(**batch_input)
+            #         # with self.compute_loss_context_manager():
+            #         #     _, outputs_ = self.compute_loss(model, batch_input, return_outputs=True)
+            #         predict_probs = outputs_["logits"].detach().softmax(dim=-1).cpu()
+            #         predict_labels = predict_probs.argmax(dim=-1)
+            #         gold_labels = batch_input["labels"].cpu()
+            #         correct = predict_labels.eq(gold_labels)
 
-                dataloader = self.get_train_dataloader()
-                for batch in dataloader:
-                    batch_input = self._prepare_inputs(batch)
-                    with self.compute_loss_context_manager():
-                        loss, outputs = self.compute_loss(model, batch_input, return_outputs=True)
-                    
-                    predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
-                    predict_labels = predict_probs.argmax(dim=-1)
-                    gold_labels = batch_input["labels"].cpu()
-                    correct = predict_labels.eq(gold_labels)
+            #         # get probability of gold label of each instance
+            #         gold_probs = predict_probs.gather(
+            #             dim=-1, index=gold_labels.unsqueeze(-1)
+            #         ).squeeze(-1)
 
-                    # get probability of gold label of each instance
-                    gold_probs = predict_probs.gather(
-                        dim=-1, index=gold_labels.unsqueeze(-1)
-                    ).squeeze(-1)
-                    
-                    self.training_instance_probs.extend(gold_probs.tolist())
-                    self.training_instance_corrects.extend(correct.tolist())
-
-                self.acc_data = 0
+            #         self.training_instance_probs.extend(gold_probs.tolist())
+            #         self.training_instance_corrects.extend(correct.tolist())
+            #     logger.info(f"Finish training dynamic: {len(eval_dataset)} examples")
+            #     self.acc_data = 0
             
             return loss.detach()
-        def get_train_dataloader(self) -> DataLoader:
+
+        def get_eval_dataloader_seq(self) -> DataLoader:
             """
             Returns the training [`~torch.utils.data.DataLoader`].
             Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
             training if necessary) otherwise.
             Subclass and override this method if you want to inject some custom behavior.
             """
-            if self.train_dataset is None:
+            if self.eval_dataset is None:
                 raise ValueError("Trainer: training requires a train_dataset.")
 
-            train_dataset = self.train_dataset
+            eval_dataset = self.eval_dataset
             data_collator = self.data_collator
-            if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
-                train_dataset = self._remove_unused_columns(train_dataset, description="training")
+            if is_datasets_available() and isinstance(eval_dataset, datasets.Dataset):
+                eval_dataset = self._remove_unused_columns(eval_dataset, description="validation")
             else:
-                data_collator = self._get_collator_with_removed_columns(data_collator, description="training")
+                data_collator = self._get_collator_with_removed_columns(data_collator, description="validation")
 
-            if isinstance(train_dataset, torch.utils.data.IterableDataset):
+            if isinstance(eval_dataset, torch.utils.data.IterableDataset):
                 if self.args.world_size > 1:
-                    train_dataset = IterableDatasetShard(
-                        train_dataset,
+                    eval_dataset = IterableDatasetShard(
+                        eval_dataset,
                         batch_size=self._train_batch_size,
                         drop_last=self.args.dataloader_drop_last,
                         num_processes=self.args.world_size,
@@ -621,19 +620,19 @@ def main():
                     )
 
                 return DataLoader(
-                    train_dataset,
+                    eval_dataset,
                     batch_size=self._train_batch_size,
                     collate_fn=data_collator,
                     num_workers=self.args.dataloader_num_workers,
                     pin_memory=self.args.dataloader_pin_memory,
                 )
 
-            train_sampler = SequentialSampler(train_dataset)
+            evel_sampler = SequentialSampler(eval_dataset)
 
             return DataLoader(                                      # returns here
-                train_dataset,
-                batch_size=self._train_batch_size,
-                sampler=train_sampler,
+                eval_dataset,
+                batch_size=1,
+                sampler=evel_sampler,
                 collate_fn=data_collator,
                 drop_last=self.args.dataloader_drop_last,
                 num_workers=self.args.dataloader_num_workers,
@@ -672,11 +671,23 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-        # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
+        training_dynamics = {
+            "prob": trainer.training_instance_probs,
+            "correct": trainer.training_instance_corrects
+        }
+        output_dynamics_file = os.path.join(
+            "./training_dynamic", f"record.json"
+        )
+        with open(output_dynamics_file, "w") as writer:
+            json.dump(training_dynamics, writer)
+
+        '''
+        training_instance_dynamic_gold_probs: (num_instances, num_epochs)
         training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
         training_instance_dynamic_gold_probs = (
             training_instance_dynamic_gold_probs.reshape(metrics["train_samples"], -1)
         )
+        
         # training_instance_gold_prob_means: (num_instances)
         training_instance_gold_prob_means = np.mean(
             training_instance_dynamic_gold_probs, axis=1
@@ -691,6 +702,7 @@ def main():
         training_instance_correct = training_instance_correct.reshape(
             metrics["train_samples"], -1
         )
+        
         # training_instance_correct_means: (num_instances)
         training_instance_correct_means = np.mean(training_instance_correct, axis=1)
         training_dynamics = {
@@ -705,7 +717,7 @@ def main():
         )
         with open(output_dynamics_file, "w") as writer:
             json.dump(training_dynamics, writer)
-
+        '''
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
