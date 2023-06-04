@@ -443,6 +443,20 @@ def main():
 
             with self.compute_loss_context_manager():
                 loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+            
+            predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
+            predict_labels = predict_probs.argmax(dim=-1)
+            gold_labels = inputs["labels"].cpu()
+            correct = predict_labels.eq(gold_labels)
+
+            # get probability of gold label of each instance
+            gold_probs = predict_probs.gather(
+                dim=-1, index=gold_labels.unsqueeze(-1)
+            ).squeeze(-1)
+
+            self.training_instance_probs.extend(gold_probs.tolist())
+            self.training_instance_corrects.extend(correct.tolist())
+    
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -458,30 +472,6 @@ def main():
                 loss = self.deepspeed.backward(loss)
             else:
                 loss.backward()
-
-            # Record training dynamics
-            if self.acc_data >= len(self.train_dataset):
-                dataloader = self.get_train_dataloader_seq()
-
-                for batch in dataloader:
-                    batch_inputs = self._prepare_inputs(batch)
-                    with self.compute_loss_context_manager():
-                        loss, outputs = self.compute_loss(model, batch_inputs, return_outputs=True)
-                    
-                    predict_probs = outputs["logits"].detach().softmax(dim=-1).cpu()
-                    predict_labels = predict_probs.argmax(dim=-1)
-                    gold_labels = batch_inputs["labels"].cpu()
-                    correct = predict_labels.eq(gold_labels)
-
-                    # get probability of gold label of each instance
-                    gold_probs = predict_probs.gather(
-                        dim=-1, index=gold_labels.unsqueeze(-1)
-                    ).squeeze(-1)
-
-                    self.training_instance_probs.extend(gold_probs.tolist())
-                    self.training_instance_corrects.extend(correct.tolist())
-    
-                self.acc_data = 0
 
             return loss.detach()
         
@@ -612,6 +602,15 @@ def main():
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
+
+        # Save training_instance_probs and training_instance_corrects
+        training_probs_corrects = {
+            'training_instance_probs': trainer.training_instance_probs,
+            'training_instance_correct': trainer.training_instance_corrects
+        }
+
+        with open('training_probs_corrects.json', 'w') as writer:
+            json.dump(training_probs_corrects, writer)
 
         # training_instance_dynamic_gold_probs: (num_instances, num_epochs)
         training_instance_dynamic_gold_probs = np.array(trainer.training_instance_probs)
