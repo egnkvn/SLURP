@@ -6,20 +6,22 @@ from argparse import ArgumentParser
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--method', type=str)                               # e2e or pipeline
     parser.add_argument('--training_dynamics_path', type=str)               # The file recording training dynamics
-    parser.add_argument('--filename_info', type=str)                        # Where to get file names
     parser.add_argument('--save_path', type=str)
-    parser.add_argument('--ambig_thres', type=int, default=67)
-    parser.add_argument('--hard_thres', type=int, default=33)
-    parser.add_argument('--easy_thres', type=int, default=67)
+    parser.add_argument('--ambig_thres', type=float)
+    parser.add_argument('--hard_thres', type=float, default=1)
+    parser.add_argument('--easy_thres', type=float)
     args = parser.parse_args()
     return args
 
 def relabel(training_dynamics, file_names, ambig_thres, hard_thres, easy_thres):
-    var_top33 = np.percentile(training_dynamics["gold_prob_stds"], ambig_thres)     # Ambiguous
-    conf_btm33 = np.percentile(training_dynamics["gold_prob_means"], hard_thres)    # Hard
-    conf_top33 = np.percentile(training_dynamics["gold_prob_means"], easy_thres)    # Easy
+    var_top33 = np.percentile(training_dynamics["prob_std"], ambig_thres)     # Ambiguous
+    conf_btm33 = np.percentile(training_dynamics["prob_mean"], hard_thres)    # Hard
+    conf_top33 = np.percentile(training_dynamics["prob_mean"], easy_thres)    # Easy
+
+    print(f'Ambiguous threshold: Variability > {var_top33}')
+    print(f'Hard threshold: Confidence < {conf_btm33}')
+    print(f'Easy threshold: Confidence > {conf_top33}')
 
     relabeled_data = {
         'ambig': list(),
@@ -28,11 +30,11 @@ def relabel(training_dynamics, file_names, ambig_thres, hard_thres, easy_thres):
     }
 
     for idx in range(len(file_names)):
-        if training_dynamics["gold_prob_stds"][idx] >= var_top33:           # Ambiguous
+        if training_dynamics["prob_std"][idx] >= var_top33:           # Ambiguous
             relabeled_data['ambig'].append(file_names[idx])
-        if training_dynamics["gold_prob_means"][idx] <= conf_btm33:         # Hard
+        if training_dynamics["prob_mean"][idx] <= conf_btm33:         # Hard
             relabeled_data['hard'].append(file_names[idx])
-        if training_dynamics["gold_prob_means"][idx] >= conf_top33:         # Easy
+        if training_dynamics["prob_mean"][idx] >= conf_top33:         # Easy
             relabeled_data['easy'].append(file_names[idx])
 
     print(f'Number of ambiguous examples: {len(relabeled_data["ambig"])}')
@@ -47,15 +49,11 @@ def main(args):
         training_dynamics = json.load(json_file)
         
     # Get file names
-    if args.method == 'e2e':
-        df = pd.read_csv(args.filename_info)
-        file_names = [fname.split('data/')[1] for fname in df['file_name']]
-    else:
-        # TODO
-        df = pd.read_json(args.filename_info)
-        # file_names = [fname.split('data/')[1] for fname in df['file']]
-        file_names = [fname for fname in df['file']]
-        pass                                                           
+    file_names = list(training_dynamics.keys())
+    training_dynamics = {
+        'prob_mean':  [training_dynamics[fname]['prob_mean'] for fname in training_dynamics.keys()],
+        'prob_std': [training_dynamics[fname]['prob_std'] for fname in training_dynamics.keys()]
+    }
     print(f'Number of files: {len(file_names)}')
 
     # Relabel examples

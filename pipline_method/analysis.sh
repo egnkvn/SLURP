@@ -1,12 +1,9 @@
 training_dynamics="${1:-./training_dynamic/new.json}"
-dataset_file="${2:-./datasets/google/train_golden.json}"
-save_file="${3:-./training_dynamic/analysis/golden.json}"
-threshold="${4:-1}"
+save_file="${2:-./training_dynamic/analysis/golden.json}"
+threshold="${3:-1}"
 
 python ../training_dynamics_analysis.py \
- --method "pipeline" \
  --training_dynamics_path "${training_dynamics}" \
- --filename_info "${dataset_file}" \
  --save_path "${save_file}" \
  --ambig_thres "$((100 - threshold))" \
  --hard_thres "${threshold}" \
