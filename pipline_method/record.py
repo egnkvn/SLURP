@@ -2,7 +2,7 @@ import json
 import random
 import numpy as np
 
-with open('../fname_as_input/fname.json', 'r') as f:
+with open('../fname_as_input/fname_5.json', 'r') as f:
     fname = json.load(f)
 with open('./training_dynamic/record.json', 'r') as f:
     record = json.load(f)
@@ -35,7 +35,7 @@ for File in result:
     "correct_mean": correct_mean
   }
 
-with open('./training_dynamic/asr.json', 'w') as f:
+with open('./training_dynamic/golden_5.json', 'w') as f:
     json.dump(output, f, indent=2)
 
 

@@ -7,9 +7,9 @@ from argparse import ArgumentParser
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='./training_dynamic/golden.json')
-    parser.add_argument('--save_path', type=str, default='./golden.png')
-    parser.add_argument('--title', type=str, default='Pipeline Method (golden)')
+    parser.add_argument('--data_path', type=str, default='./training_dynamic/golden_5.json')
+    parser.add_argument('--save_path', type=str, default='./golden_5.png')
+    parser.add_argument('--title', type=str, default='Pipeline Method (golden_5)')
     args = parser.parse_args()
     return args
 
