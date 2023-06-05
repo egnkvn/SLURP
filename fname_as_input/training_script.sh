@@ -18,8 +18,8 @@ CUDA_VISIBLE_DEVICES=2 python run_text_classification.py \
     --do_predict False \
     --evaluation_strategy "epoch" \
     --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 16 d\
-    --num_train_epoch 20 \
+    --per_device_eval_batch_size 16\
+    --num_train_epoch 5 \
     --save_strategy "epoch" \
     --save_total_limit 1 \
     --seed "${seed}" \
